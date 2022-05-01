@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script async src="https://docs.opencv.org/4.5.5/opencv.js" onload="openCvReady();"></script>
+  <script src="https://docs.opencv.org/4.5.5/utils.js"></script>
+  <title>Face Recognition</title>
+</head>
+<body>
+  <div class="container mx-auto p-4">
+    <div class="columns-2">
+      <video width="320" height="240" autoplay></video>
+      <div>
+        <canvas id="canvasOutput" width="320" height="240" />
+      </div>
+    </div>
+  </div>
+  <script>
+    const constraints = {
+      audio: false,
+      video: { width: screen.width, height: screen.height }
+    };
+  
+    const video = document.querySelector('video');
+    const canvas = document.createElement('canvas');
+    let conn;
+  
+    (function init() {
+      navigator.mediaDevices
+        .getUserMedia(constraints)
+        .then(handleSuccess)
+        .catch(handleError);
+    })();
+  
+    function handleSuccess(stream) {
+      const video = document.querySelector('video');
+      const videoTracks = stream.getVideoTracks();
+      console.log('Got stream with constraints:', constraints);
+      console.log(`Using video device: ${videoTracks[0].label}`);
+      window.stream = stream; // make variable available to browser console
+      video.srcObject = stream;
+    }
+  
+    function handleError(error) {
+      console.error('Error: ', error);
+    }
+  </script>
+  <script>
+    function openCvReady() {
+      cv['onRuntimeInitialized'] = () => {
+        let video = document.querySelector("video");
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(function(stream) {
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(function(err) {
+          console.log("An error occurred! " + err);
+        });
+
+        let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+        let dst = new cv.Mat(video.height, video.width, cv.CV_8UC1);
+        let gray = new cv.Mat();
+        let cap = new cv.VideoCapture(video);
+        let faces = new cv.RectVector();
+        let classifier = new cv.CascadeClassifier();
+        let utils = new Utils('errorMessage');
+
+        utils.createFileFromUrl("haarcascade_frontalface_default.xml", "/public/haarcascade_frontalface_default.xml", () => {
+          classifier.load("haarcascade_frontalface_default.xml");
+        });
+        const FPS = 60;
+        function processVideo() {
+          let begin = Date.now();
+          cap.read(src);
+          src.copyTo(dst);
+          cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY, 0);
+          try{
+              classifier.detectMultiScale(gray, faces, 1.1, 3, 0);
+              console.log('faces', faces.size());
+          }catch(err){
+              console.log('err', err);
+          }
+          for (let i = 0; i < faces.size(); ++i) {
+              let face = faces.get(i);
+              let point1 = new cv.Point(face.x, face.y);
+              let point2 = new cv.Point(face.x + face.width, face.y + face.height);
+              cv.rectangle(dst, point1, point2, [255, 0, 0, 255]);
+          }
+          // cv.imshow("canvasOutput", dst);
+          // schedule next one.
+          let delay = 1000/FPS - (Date.now() - begin);
+          setTimeout(processVideo, 500);
+        }
+        // schedule first one.
+        setTimeout(processVideo, 0);
+      }
+    }
+  </script>
+</body>
+
+
