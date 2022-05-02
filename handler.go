@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	addr "face-recognize/Pages"
+	addr "face-recognize/Page"
 	public "face-recognize/public"
 )
 
@@ -16,7 +16,7 @@ func main() {
 		listenAddr = ":" + val
 	}
 
-	http.HandleFunc("/pages/index", addr.Path)
+	http.HandleFunc("/page/index", addr.Path)
 	http.HandleFunc("/public/haarcascade_frontalface_default.xml", public.Classifier)
 
 	log.Printf("About to listen on %s. Go to https://127.0.0.1%s/", listenAddr, listenAddr)
