@@ -7,6 +7,44 @@
     <title>Face Regist</title>
   </head>
   <body>
-    
+    <div class="container mx-auto">
+      <video width="720" height="480" autoplay></video>
+      <div>
+        <button class="rounded px-3 py-1.25 text-white bg-yellow-500" type="button" onclick="startVideo()">시작</button>
+        <button class="rounded px-3 py-1.25 text-white bg-yellow-500" type="button" onclick="stopVideo()">멈춤</button>
+      </div>
+    </div>
   </body>
+  <script>
+    const constraints = {
+      audio: false,
+      video: {}
+    };
+
+    const video = document.querySelector('video');
+    const canvas = document.createElement('canvas');
+
+    function startVideo() {
+      navigator.mediaDevices
+        .getUserMedia(constraints)
+        .then(handleSuccess)
+        .catch(handleError);
+    }
+
+    function stopVideo() {
+      const mediaStream = video.srcObject;
+      const tracks = mediaStream.getTracks();
+
+      tracks.forEach((track) => track.stop());
+      video.srcObject = null;
+    }
+
+    function handleSuccess(stream) {
+      video.srcObject = stream;
+    }
+
+    function handleError(error) {
+      console.error('Error: ', error);
+    }
+  </script>
 </html>

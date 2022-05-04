@@ -7,7 +7,7 @@
       "name": "req",
       "route": "face",
       "methods": [
-        "post"
+        "get"
       ]
     },
     {
