@@ -7,19 +7,25 @@
     <title>Face Regist</title>
   </head>
   <body>
-    <div class="container mx-auto">
-      <video width="720" height="480" autoplay></video>
-      <div>
+    <div class="container mx-auto mt-4 mb-4">
+      <div class="flex justify-center"><video autoplay></video></div>
+      <div class="flex justify-center mt-4 gap-4">
         <button class="rounded px-3 py-1.25 text-white bg-yellow-500" type="button" onclick="startVideo()">시작</button>
         <button class="rounded px-3 py-1.25 text-white bg-yellow-500" type="button" onclick="stopVideo()">멈춤</button>
+        <button class="rounded px-3 py-1.25 text-white bg-yellow-500" type="button" onclick="send()">등록</button>
+      </div>
+      <div id="face-images" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 inset-0 w-full">
+
       </div>
     </div>
   </body>
   <script>
     const constraints = {
       audio: false,
-      video: {}
+      video: {},
     };
+
+    let timer = null;
 
     const video = document.querySelector('video');
     const canvas = document.createElement('canvas');
@@ -29,9 +35,12 @@
         .getUserMedia(constraints)
         .then(handleSuccess)
         .catch(handleError);
+
+      setTimeout(capture, 3000);
     }
 
     function stopVideo() {
+      clearTimeout(timer);
       const mediaStream = video.srcObject;
       const tracks = mediaStream.getTracks();
 
@@ -45,6 +54,39 @@
 
     function handleError(error) {
       console.error('Error: ', error);
+    }
+
+    function capture() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/png');
+      img.className = "object-cover object-center rounded-full w-16 h-16 face-image";
+
+      const captureImage = document.getElementById('face-images');
+      captureImage.appendChild(img);
+
+      timer = setTimeout(capture, 1000);
+    }
+
+    async function send() {
+      const faceImages = document.getElementsByClassName('face-image');
+      const faces = Array.from(faceImages).map(face => face.src);
+
+      await fetch('http://localhost:7071/face', {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: JSON.stringify({
+          faces,
+          name: '아무개',
+        }),
+      })
     }
   </script>
 </html>
