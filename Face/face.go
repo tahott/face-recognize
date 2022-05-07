@@ -1,12 +1,23 @@
 package face
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/Azure/azure-sdk-for-go/services/cognitiveservices/v1.0/face"
+	"github.com/Azure/go-autorest/autorest"
 )
+
+type FaceService struct {
+	client                  *face.Client
+	personGroupClient       *face.PersonGroupClient
+	personGroupPersonClient *face.PersonGroupPersonClient
+}
 
 type FaceRegist struct {
 	Faces []string `json:"faces,omitempty"`
@@ -40,4 +51,39 @@ func Regist(w http.ResponseWriter, r *http.Request) {
 	default:
 		fmt.Fprint(w, "NOT ALLOWED METHOD")
 	}
+}
+
+func Start() *FaceService {
+	authorizer := autorest.NewCognitiveServicesAuthorizer(os.Getenv("FACE_SUB_KEY"))
+
+	client := face.NewClient(os.Getenv("FACE_ENDPOINT"))
+	client.Authorizer = authorizer
+
+	personGroupClient := face.NewPersonGroupClient(os.Getenv("FACE_ENDPOINT"))
+	personGroupClient.Authorizer = authorizer
+
+	faceService := &FaceService{
+		client:            &client,
+		personGroupClient: &personGroupClient,
+	}
+
+	return faceService
+}
+
+func (faceService *FaceService) CreateGroup(id, name string) (autorest.Response, error) {
+	metadata := face.MetaDataContract{
+		RecognitionModel: "recongnition_04",
+		Name:             &name,
+	}
+
+	return faceService.personGroupClient.Create(context.Background(), id, metadata)
+}
+
+func (faceService *FaceService) CreatePerson(id, name, userData string) (face.Person, error) {
+	metadata := face.NameAndUserDataContract{
+		Name:     &name,
+		UserData: &userData,
+	}
+
+	return faceService.personGroupPersonClient.Create(context.Background(), id, metadata)
 }

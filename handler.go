@@ -7,7 +7,7 @@ import (
 
 	face "face-recognize/Face"
 	addr "face-recognize/Page"
-	public "face-recognize/public"
+	public "face-recognize/Public"
 )
 
 func main() {
