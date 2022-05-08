@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/cognitiveservices/v1.0/face"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/gofrs/uuid"
 )
 
 type FaceService struct {
@@ -36,6 +39,8 @@ func Regist(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		defer r.Body.Close()
 
+		faceService := Start()
+
 		bytes, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			log.Fatal(err)
@@ -48,6 +53,31 @@ func Regist(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal([]byte(data), body)
 
 		fmt.Println(body.Name, len(body.Faces))
+
+		returnRecognitionModel := false
+		temp_pg, _ := faceService.personGroupClient.Get(context.Background(), "temp-person-group", &returnRecognitionModel)
+
+		if temp_pg.PersonGroupID == nil {
+			faceService.CreateGroup("temp-person-group", "임시")
+		}
+
+		random_id, _ := uuid.FromString("some string")
+
+		isPerson, _ := faceService.personGroupPersonClient.Get(context.Background(), "temp-person-group", random_id)
+
+		var personId uuid.UUID
+		if isPerson.PersonID == nil {
+			person, _ := faceService.CreatePerson("temp-person-group", "아무개", "")
+
+			personId = *person.PersonID
+		}
+
+		for _, v := range body.Faces {
+			r := io.NopCloser(strings.NewReader(v))
+
+			faceService.AddFaceData("", personId, r)
+		}
+
 	default:
 		fmt.Fprint(w, "NOT ALLOWED METHOD")
 	}
@@ -79,6 +109,10 @@ func (faceService *FaceService) CreateGroup(id, name string) (autorest.Response,
 	return faceService.personGroupClient.Create(context.Background(), id, metadata)
 }
 
+func (faceService *FaceService) DeleteGroup(id string) {
+	faceService.personGroupClient.Delete(context.Background(), id)
+}
+
 func (faceService *FaceService) CreatePerson(id, name, userData string) (face.Person, error) {
 	metadata := face.NameAndUserDataContract{
 		Name:     &name,
@@ -86,4 +120,9 @@ func (faceService *FaceService) CreatePerson(id, name, userData string) (face.Pe
 	}
 
 	return faceService.personGroupPersonClient.Create(context.Background(), id, metadata)
+}
+
+func (faceService *FaceService) AddFaceData(group string, person uuid.UUID, url io.ReadCloser) {
+	faceService.personGroupPersonClient.AddFaceFromStream(context.Background(), group, person, url, "", nil, "detection_03")
+	faceService.personGroupClient.Train(context.Background(), group)
 }
