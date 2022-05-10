@@ -22,64 +22,61 @@ type FaceService struct {
 	personGroupPersonClient *face.PersonGroupPersonClient
 }
 
+type GroupRegist struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type FaceRegist struct {
 	Faces []string `json:"faces,omitempty"`
 	Name  string   `json:"name,omitempty"`
 }
 
 func Regist(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		var content []byte
+	path := strings.Split(r.URL.Path, "/")
 
-		content, _ = ioutil.ReadFile("face_regist.html")
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	switch path[len(path)-1] {
+	case "regist":
+		switch r.Method {
+		case "GET":
+			var content []byte
 
-		w.Write(content)
-	case "POST":
-		defer r.Body.Close()
+			content, _ = ioutil.ReadFile("face_regist.html")
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-		faceService := Start()
-
-		bytes, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Fatal(err)
+			w.Write(content)
+		default:
+			fmt.Fprint(w, "NOT ALLOWED METHOD")
 		}
+	case "group":
+		switch r.Method {
+		case "POST":
+			defer r.Body.Close()
 
-		data := string(bytes)
+			faceService := Start()
 
-		body := &FaceRegist{}
+			bytes, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		json.Unmarshal([]byte(data), body)
+			data := string(bytes)
 
-		fmt.Println(body.Name, len(body.Faces))
+			body := &GroupRegist{}
 
-		returnRecognitionModel := false
-		temp_pg, _ := faceService.personGroupClient.Get(context.Background(), "temp-person-group", &returnRecognitionModel)
+			json.Unmarshal([]byte(data), body)
 
-		if temp_pg.PersonGroupID == nil {
-			faceService.CreateGroup("temp-person-group", "임시")
+			fmt.Println(body.Name, body.Id)
+
+			_, err = faceService.CreateGroup(body.Id, body.Name)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Fprintf(w, "Create group success!!")
 		}
-
-		random_id, _ := uuid.FromString("some string")
-
-		isPerson, _ := faceService.personGroupPersonClient.Get(context.Background(), "temp-person-group", random_id)
-
-		var personId uuid.UUID
-		if isPerson.PersonID == nil {
-			person, _ := faceService.CreatePerson("temp-person-group", "아무개", "")
-
-			personId = *person.PersonID
-		}
-
-		for _, v := range body.Faces {
-			r := io.NopCloser(strings.NewReader(v))
-
-			faceService.AddFaceData("", personId, r)
-		}
-
 	default:
-		fmt.Fprint(w, "NOT ALLOWED METHOD")
+		fmt.Fprint(w, "NOT ALLOWED PATH")
 	}
 }
 
@@ -102,7 +99,7 @@ func Start() *FaceService {
 
 func (faceService *FaceService) CreateGroup(id, name string) (autorest.Response, error) {
 	metadata := face.MetaDataContract{
-		RecognitionModel: "recongnition_04",
+		RecognitionModel: "recognition_04",
 		Name:             &name,
 	}
 

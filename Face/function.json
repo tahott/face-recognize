@@ -8,7 +8,9 @@
       "route": "face/{category:alpha}",
       "methods": [
         "get",
-        "post"
+        "post",
+        "put",
+        "delete"
       ]
     },
     {
