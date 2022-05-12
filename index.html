@@ -48,6 +48,33 @@
     }
   </script>
   <script>
+    async function send() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/png');
+      img.className = "object-cover object-center rounded-full w-16 h-16";
+      img.id = "face-image";
+
+      const face = img.src
+
+      const response = await fetch('http://localhost:7071/face/identify', {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: JSON.stringify({
+          face,
+        })
+      })
+
+      return await response.json();
+    }
+
     function openCvReady() {
       cv['onRuntimeInitialized'] = () => {
         let video = document.querySelector("video");
@@ -84,7 +111,8 @@
             checkFace.push(faces.size());
             if(checkFace.length > 4) {
               if (checkFace.every(size => size > 0)) {
-                alert('send face');
+                const face = send()
+                face.then(data => alert(JSON.stringify(data)));
               }
               
               checkFace = [];

@@ -75,7 +75,7 @@
       const faceImages = document.getElementsByClassName('face-image');
       const faces = Array.from(faceImages).map(face => face.src);
 
-      await fetch('http://localhost:7071/face', {
+      await fetch('http://localhost:7071/face/regist', {
         method: 'POST',
         mode: 'cors',
         credentials: 'same-origin',
