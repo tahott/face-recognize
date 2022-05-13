@@ -1,17 +1,12 @@
 package face
 
 import (
-	b "bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/cognitiveservices/v1.0/face"
 	"github.com/Azure/go-autorest/autorest"
@@ -43,161 +38,6 @@ type ResponseIdentifyDto struct {
 	Confidence float64 `json:"confidence"`
 }
 
-func Regist(w http.ResponseWriter, r *http.Request) {
-	path := strings.Split(r.URL.Path, "/")
-
-	switch path[len(path)-1] {
-	case "identify":
-		switch r.Method {
-		case "POST":
-			defer r.Body.Close()
-
-			faceService := Start()
-
-			bytes, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			data := string(bytes)
-
-			body := &FaceIdentify{}
-
-			json.Unmarshal([]byte(data), body)
-
-			i := strings.Index(body.Face, ",")
-			dec, _ := base64.StdEncoding.DecodeString(body.Face[i+1:])
-			reader := b.NewReader(dec)
-
-			buf := make([]byte, len(dec))
-			if _, err := reader.Read(buf); err != nil {
-				log.Fatal(err)
-			}
-
-			r := io.NopCloser(strings.NewReader(string(buf)))
-
-			personId, confidence := faceService.IdentifyFace(r)
-
-			person, err := faceService.GetPerson("face", personId)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			result := &ResponseIdentifyDto{
-				Name:       *person.Name,
-				Confidence: confidence,
-			}
-
-			json, _ := json.Marshal(result)
-
-			w.Write(json)
-		default:
-			fmt.Fprint(w, "NOT ALLOWED METHOD")
-		}
-	case "regist":
-		switch r.Method {
-		case "GET":
-			var content []byte
-
-			content, _ = ioutil.ReadFile("face_regist.html")
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-			w.Write(content)
-		case "POST":
-			defer r.Body.Close()
-
-			faceService := Start()
-
-			bytes, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			data := string(bytes)
-
-			body := &FaceRegist{}
-
-			json.Unmarshal([]byte(data), body)
-
-			person, err := faceService.CreatePerson("face", body.Name, "")
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			for _, image := range body.Faces {
-				i := strings.Index(image, ",")
-				dec, _ := base64.StdEncoding.DecodeString(image[i+1:])
-				reader := b.NewReader(dec)
-
-				buf := make([]byte, len(dec))
-
-				if _, err := reader.Read(buf); err != nil {
-					log.Fatal(err)
-				}
-
-				r := io.NopCloser(strings.NewReader(string(buf)))
-
-				if _, err := faceService.AddFaceData("face", *person.PersonID, r); err != nil {
-					log.Fatal(err)
-				}
-			}
-
-			faceService.personGroupClient.Train(context.Background(), "face")
-		default:
-			fmt.Fprint(w, "NOT ALLOWED METHOD")
-		}
-	case "group":
-		switch r.Method {
-		case "POST":
-			defer r.Body.Close()
-
-			faceService := Start()
-
-			bytes, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			data := string(bytes)
-
-			body := &GroupRegist{}
-
-			json.Unmarshal([]byte(data), body)
-
-			_, err = faceService.CreateGroup(body.Id, body.Name)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			fmt.Fprintf(w, "Create group success!!")
-		case "DELETE":
-			defer r.Body.Close()
-
-			faceService := Start()
-
-			bytes, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			data := string(bytes)
-
-			body := &GroupRegist{}
-
-			json.Unmarshal([]byte(data), body)
-
-			_, err = faceService.DeleteGroup(body.Id)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			fmt.Fprintf(w, "Delete group")
-		}
-	default:
-		fmt.Fprint(w, "NOT ALLOWED PATH")
-	}
-}
-
 func Start() *FaceService {
 	authorizer := autorest.NewCognitiveServicesAuthorizer(os.Getenv("FACE_SUB_KEY"))
 
@@ -219,7 +59,7 @@ func Start() *FaceService {
 	return faceService
 }
 
-func (faceService *FaceService) CreateGroup(id, name string) (autorest.Response, error) {
+func (faceService *FaceService) createGroup(id, name string) (autorest.Response, error) {
 	metadata := face.MetaDataContract{
 		RecognitionModel: "recognition_04",
 		Name:             &name,
@@ -228,11 +68,11 @@ func (faceService *FaceService) CreateGroup(id, name string) (autorest.Response,
 	return faceService.personGroupClient.Create(context.Background(), id, metadata)
 }
 
-func (faceService *FaceService) DeleteGroup(id string) (autorest.Response, error) {
+func (faceService *FaceService) deleteGroup(id string) (autorest.Response, error) {
 	return faceService.personGroupClient.Delete(context.Background(), id)
 }
 
-func (faceService *FaceService) CreatePerson(id, name, userData string) (face.Person, error) {
+func (faceService *FaceService) createPerson(id, name, userData string) (face.Person, error) {
 	metadata := face.NameAndUserDataContract{
 		Name:     &name,
 		UserData: &userData,
@@ -241,15 +81,15 @@ func (faceService *FaceService) CreatePerson(id, name, userData string) (face.Pe
 	return faceService.personGroupPersonClient.Create(context.Background(), id, metadata)
 }
 
-func (faceService *FaceService) GetPerson(groupId string, personId uuid.UUID) (face.Person, error) {
+func (faceService *FaceService) getPerson(groupId string, personId uuid.UUID) (face.Person, error) {
 	return faceService.personGroupPersonClient.Get(context.Background(), groupId, personId)
 }
 
-func (faceService *FaceService) AddFaceData(group string, person uuid.UUID, stream io.ReadCloser) (face.PersistedFace, error) {
+func (faceService *FaceService) addFaceData(group string, person uuid.UUID, stream io.ReadCloser) (face.PersistedFace, error) {
 	return faceService.personGroupPersonClient.AddFaceFromStream(context.Background(), group, person, stream, "", nil, "detection_03")
 }
 
-func (faceService *FaceService) IdentifyFace(stream io.ReadCloser) (uuid.UUID, float64) {
+func (faceService *FaceService) identifyFace(stream io.ReadCloser) (uuid.UUID, float64) {
 	returnIdentifyFaceID := true
 	returnRecognitionModel := true
 	returnFaceLandmarks := false
